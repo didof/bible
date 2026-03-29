@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>FocusBible - Minimalist Reader</title>
+<script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+    .serif-text { font-family: 'Georgia', serif; line-height: 2; }
+    .highlight { background-color: #fef08a; cursor: pointer; transition: background 0.2s; }
+    .verse-num { font-size: 0.75rem; vertical-align: super; color: #9ca3af; margin-right: 4px; user-select: none; }
+    .verse-text { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .verse-text:hover { background-color: #f3f4f6; }
+    @media (hover: none) { .verse-text:hover { background-color: transparent; } }
+</style>
+</head>
+<body class="bg-[#FCFCF9] text-gray-900 h-screen flex overflow-hidden ui-text overscroll-none">
+
+<header class="md:hidden fixed top-0 w-full bg-white/90 backdrop-blur-sm border-b border-gray-200 z-20 flex items-center justify-between p-4 h-14">
+    <button id="menuBtn" class="p-2 -ml-2 text-gray-700">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+    </button>
+    <h1 id="mobileTitle" class="font-bold text-lg truncate flex-1 text-center pr-6">FocusBible</h1>
+</header>
+
+<div id="sidebarOverlay" class="fixed inset-0 bg-black/20 backdrop-blur-sm z-20 hidden md:hidden transition-opacity"></div>
+
+<aside id="leftSidebar" class="w-72 bg-white border-r border-gray-200 flex flex-col h-full font-sans fixed inset-y-0 left-0 z-30 transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-300 shadow-2xl md:shadow-none">
+    <div class="p-4 border-b border-gray-200 flex justify-between items-center h-14 md:h-auto shrink-0">
+        <h1 class="text-xl font-bold tracking-tight hidden md:block">FocusBible</h1>
+        <button id="closeMenuBtn" class="md:hidden p-2 -ml-2 text-gray-500">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+        <button id="exportBtn" class="text-sm text-blue-600 hover:underline md:mt-2">Export</button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-2" id="bookList">
+        <p class="text-sm text-gray-500 p-2">Loading KJV...</p>
+    </div>
+</aside>
+
+<main id="mainScroll" class="flex-1 overflow-y-auto px-4 py-20 md:px-8 md:py-12 flex justify-center relative scroll-smooth">
+    <div class="max-w-2xl w-full">
+        <h2 id="chapterTitle" class="text-3xl font-bold mb-8 serif-text text-center md:text-left">Select a Book</h2>
+        <div id="readerContent" class="serif-text text-lg md:text-xl"></div>
+        
+        <div id="chapterNav" class="mt-12 flex justify-between items-center border-t border-gray-200 pt-8 hidden pb-24 md:pb-8">
+            <button id="prevChapterBtn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">← Previous</button>
+            <button id="nextChapterBtn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">Next →</button>
+        </div>
+    </div>
+</main>
+
+<div id="noteOverlay" class="fixed inset-0 bg-black/20 backdrop-blur-sm z-30 hidden transition-opacity"></div>
+
+<aside id="notePanel" class="w-full sm:w-96 bg-white md:border-l border-gray-200 h-[85vh] md:h-full flex flex-col font-sans transform translate-y-full md:translate-y-0 md:translate-x-full transition-transform duration-300 fixed bottom-0 md:top-0 right-0 z-40 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:shadow-xl rounded-t-2xl md:rounded-none">
+    <div class="w-full flex justify-center pt-3 pb-1 md:hidden">
+        <div class="w-12 h-1.5 bg-gray-300 rounded-full"></div>
+    </div>
+    <div class="px-4 pb-4 pt-2 md:p-4 border-b border-gray-200 flex justify-between items-center bg-white md:bg-gray-50 shrink-0">
+        <h3 class="font-bold text-sm md:text-base" id="noteHeader">Note</h3>
+        <button id="closeNotePanel" class="text-gray-500 hover:text-black p-2 -mr-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+    </div>
+    <div class="p-4 flex-1 flex flex-col overflow-y-auto bg-white">
+        <div class="flex gap-2 mb-4 border-b pb-4 shrink-0">
+            <button id="highlightBtn" class="flex-1 bg-yellow-200 text-yellow-900 py-2.5 md:py-1.5 rounded-lg md:rounded text-sm font-medium hover:bg-yellow-300 transition-colors active:scale-95">Toggle Highlight</button>
+            <button id="editNoteBtn" class="hidden flex-1 bg-gray-100 text-gray-900 py-2.5 md:py-1.5 rounded-lg md:rounded text-sm font-medium hover:bg-gray-200 transition-colors active:scale-95">Edit Note</button>
+        </div>
+        
+        <div id="noteDisplay" class="prose prose-sm md:prose-base w-full hidden flex-1"></div>
+        <textarea id="noteInput" class="w-full flex-1 resize-none border-0 focus:ring-0 p-0 text-base hidden bg-transparent" placeholder="Write markdown notes here..."></textarea>
+    </div>
+    <div class="p-4 border-t border-gray-100 bg-white md:bg-gray-50 shrink-0 pb-8 md:pb-4">
+        <button id="saveNoteBtn" class="w-full bg-black text-white py-3 md:py-2.5 rounded-lg font-medium text-sm hover:bg-gray-800 transition-colors hidden active:scale-95 shadow-md">Save Note</button>
+    </div>
+</aside>
+
+<script>
+const SOURCE_URL = 'https://raw.githubusercontent.com/thiagobodruk/bible/master/json/en_kjv.json';
+let bibleData = [];
+let currentBook = 0;
+let currentChapter = 0;
+let activeVerse = null;
+
+const userData = JSON.parse(localStorage.getItem('focusBibleData')) || { highlights: [], notes: {} };
+
+const leftSidebar = document.getElementById('leftSidebar');
+const sidebarOverlay = document.getElementById('sidebarOverlay');
+const notePanel = document.getElementById('notePanel');
+const noteOverlay = document.getElementById('noteOverlay');
+
+function toggleSidebar(show) {
+    if (show) {
+        leftSidebar.classList.remove('-translate-x-full');
+        sidebarOverlay.classList.remove('hidden');
+    } else {
+        leftSidebar.classList.add('-translate-x-full');
+        sidebarOverlay.classList.add('hidden');
+    }
+}
+
+document.getElementById('menuBtn').onclick = () => toggleSidebar(true);
+document.getElementById('closeMenuBtn').onclick = () => toggleSidebar(false);
+sidebarOverlay.onclick = () => toggleSidebar(false);
+
+async function init() {
+    try {
+        const res = await fetch(SOURCE_URL);
+        bibleData = await res.json();
+        renderBookList();
+        
+        const lastRead = JSON.parse(localStorage.getItem('focusBibleLastRead'));
+        if (lastRead) {
+            renderChapter(lastRead.book, lastRead.chapter);
+        }
+    } catch (e) {
+        document.getElementById('bookList').innerHTML = '<p class="text-red-500 text-sm p-4">Error loading text.</p>';
+    }
+}
+
+function renderBookList() {
+    const container = document.getElementById('bookList');
+    container.innerHTML = '';
+    bibleData.forEach((book, bIndex) => {
+        const btn = document.createElement('button');
+        btn.className = 'block w-full text-left px-4 py-3 md:py-1.5 text-base md:text-sm text-gray-700 hover:bg-gray-50 md:hover:bg-transparent md:hover:text-black rounded-lg md:rounded-none transition-colors mb-1 md:mb-0';
+        btn.textContent = book.name;
+        btn.onclick = () => {
+            renderChapter(bIndex, 0);
+            if (window.innerWidth < 768) toggleSidebar(false);
+        };
+        container.appendChild(btn);
+    });
+}
+
+function renderChapter(bIndex, cIndex) {
+    currentBook = bIndex;
+    currentChapter = cIndex;
+    const book = bibleData[bIndex];
+    const chapter = book.chapters[cIndex];
+    
+    const titleText = `${book.name} ${cIndex + 1}`;
+    document.getElementById('chapterTitle').textContent = titleText;
+    document.getElementById('mobileTitle').textContent = titleText;
+    
+    const content = document.getElementById('readerContent');
+    content.innerHTML = '';
+
+    const p = document.createElement('p');
+    chapter.forEach((verseText, vIndex) => {
+        const verseId = `${book.abbrev}-${cIndex + 1}-${vIndex + 1}`;
+        const span = document.createElement('span');
+        span.className = 'verse-text inline-block mb-1.5 px-1 py-0.5 rounded transition-colors';
+        span.dataset.id = verseId;
+        
+        if (userData.highlights.includes(verseId)) {
+            span.classList.add('highlight');
+        }
+
+        span.innerHTML = `<span class="verse-num">${vIndex + 1}</span>${verseText} `;
+        span.onclick = () => openNotePanel(verseId, book.name, cIndex + 1, vIndex + 1);
+        p.appendChild(span);
+    });
+    content.appendChild(p);
+    
+    document.getElementById('mainScroll').scrollTop = 0;
+    
+    localStorage.setItem('focusBibleLastRead', JSON.stringify({ book: bIndex, chapter: cIndex }));
+    updateChapterNav();
+}
+
+function updateChapterNav() {
+    const nav = document.getElementById('chapterNav');
+    const prevBtn = document.getElementById('prevChapterBtn');
+    const nextBtn = document.getElementById('nextChapterBtn');
+    
+    nav.classList.remove('hidden');
+    
+    prevBtn.disabled = currentBook === 0 && currentChapter === 0;
+    prevBtn.classList.toggle('opacity-50', prevBtn.disabled);
+    prevBtn.onclick = () => {
+        if (currentChapter > 0) renderChapter(currentBook, currentChapter - 1);
+        else if (currentBook > 0) renderChapter(currentBook - 1, bibleData[currentBook - 1].chapters.length - 1);
+    };
+
+    const isLastBook = currentBook === bibleData.length - 1;
+    const isLastChapter = currentChapter === bibleData[currentBook].chapters.length - 1;
+    nextBtn.disabled = isLastBook && isLastChapter;
+    nextBtn.classList.toggle('opacity-50', nextBtn.disabled);
+    nextBtn.onclick = () => {
+        if (!isLastChapter) renderChapter(currentBook, currentChapter + 1);
+        else if (!isLastBook) renderChapter(currentBook + 1, 0);
+    };
+}
+
+function openNotePanel(verseId, bookName, chapter, verse) {
+    activeVerse = verseId;
+    document.getElementById('noteHeader').textContent = `${bookName} ${chapter}:${verse}`;
+    
+    const existingNote = userData.notes[verseId];
+    const noteInput = document.getElementById('noteInput');
+    const noteDisplay = document.getElementById('noteDisplay');
+    const editBtn = document.getElementById('editNoteBtn');
+    const saveBtn = document.getElementById('saveNoteBtn');
+    
+    noteInput.value = existingNote || '';
+    
+    if (existingNote) {
+        noteDisplay.innerHTML = marked.parse(existingNote);
+        noteDisplay.classList.remove('hidden');
+        noteInput.classList.add('hidden');
+        editBtn.classList.remove('hidden');
+        saveBtn.classList.add('hidden');
+    } else {
+        noteDisplay.classList.add('hidden');
+        noteInput.classList.remove('hidden');
+        editBtn.classList.add('hidden');
+        saveBtn.classList.remove('hidden');
+    }
+    
+    if (window.innerWidth < 768) {
+        notePanel.classList.remove('translate-y-full');
+        noteOverlay.classList.remove('hidden');
+    } else {
+        notePanel.classList.remove('translate-x-full');
+    }
+}
+
+function closePanel() {
+    if (window.innerWidth < 768) {
+        notePanel.classList.add('translate-y-full');
+        noteOverlay.classList.add('hidden');
+    } else {
+        notePanel.classList.add('translate-x-full');
+    }
+    activeVerse = null;
+}
+
+document.getElementById('editNoteBtn').onclick = () => {
+    document.getElementById('noteDisplay').classList.add('hidden');
+    document.getElementById('noteInput').classList.remove('hidden');
+    document.getElementById('editNoteBtn').classList.add('hidden');
+    document.getElementById('saveNoteBtn').classList.remove('hidden');
+    document.getElementById('noteInput').focus();
+};
+
+document.getElementById('closeNotePanel').onclick = closePanel;
+noteOverlay.onclick = closePanel;
+
+let touchStartY = 0;
+notePanel.addEventListener('touchstart', e => {
+    if (e.target.closest('#noteDisplay') || e.target.closest('textarea')) return;
+    touchStartY = e.touches[0].clientY;
+}, {passive: true});
+
+notePanel.addEventListener('touchmove', e => {
+    if (e.target.closest('#noteDisplay') || e.target.closest('textarea')) return;
+    const touchY = e.touches[0].clientY;
+    if (touchY - touchStartY > 50 && window.innerWidth < 768) {
+        closePanel();
+    }
+}, {passive: true});
+
+document.getElementById('highlightBtn').onclick = () => {
+    if (!activeVerse) return;
+    const index = userData.highlights.indexOf(activeVerse);
+    if (index > -1) {
+        userData.highlights.splice(index, 1);
+    } else {
+        userData.highlights.push(activeVerse);
+    }
+    saveUserData();
+    renderChapter(currentBook, currentChapter);
+};
+
+document.getElementById('saveNoteBtn').onclick = () => {
+    if (!activeVerse) return;
+    const text = document.getElementById('noteInput').value.trim();
+    if (text) {
+        userData.notes[activeVerse] = text;
+        document.getElementById('noteDisplay').innerHTML = marked.parse(text);
+        
+        document.getElementById('noteInput').classList.add('hidden');
+        document.getElementById('noteDisplay').classList.remove('hidden');
+        document.getElementById('saveNoteBtn').classList.add('hidden');
+        document.getElementById('editNoteBtn').classList.remove('hidden');
+    } else {
+        delete userData.notes[activeVerse];
+        closePanel();
+    }
+    saveUserData();
+};
+
+document.getElementById('exportBtn').onclick = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(userData, null, 2));
+    const node = document.createElement('a');
+    node.setAttribute("href", dataStr);
+    node.setAttribute("download", "focusbible_export.json");
+    document.body.appendChild(node);
+    node.click();
+    node.remove();
+};
+
+function saveUserData() {
+    localStorage.setItem('focusBibleData', JSON.stringify(userData));
+}
+
+init();
+</script>
+</body>
+</html>
+
+
